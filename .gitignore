@@ -1,0 +1,7 @@
+mongo/
+create_user_info.sh
+user_info.py
+__pycache__/
+venv/
+.idea/
+sb_notif.log
