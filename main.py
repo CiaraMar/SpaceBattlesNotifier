@@ -22,7 +22,21 @@ logger.addHandler(handler)
 
 mongo_client = MongoClient()
 
-smtp_server = smtplib.SMTP('smtp.gmail.com', 587)
+smtp_server = smtplib.SMTP()
+
+
+def email_connect(user, pw):
+    def dec(func):
+        def wrapper(*args, **kwargs):
+            smtp_server.connect('smtp.gmail.com', 587)
+            smtp_server.starttls()
+            smtp_server.login(user, pw)
+            func(*args, **kwargs)
+            smtp_server.quit()
+
+        return wrapper
+
+    return dec
 
 
 def get_threads():
@@ -64,7 +78,7 @@ def get_next(url):
         doc = pq(url=url)
         next_elem = doc('.next')
         sub_elems = next_elem.children()
-        new_url = sub_elems[0].values()[0]
+        new_url = sub_elems[len(sub_elems) - 1].values()[0]
         full_url = join_url(url, new_url)
         return full_url
     except:
@@ -95,6 +109,7 @@ def is_latest(url):
     return url == get_latest(url)
 
 
+@email_connect(USER, PW)
 def check_threads():
     threads = get_threads()
     for thread in threads:
@@ -104,10 +119,8 @@ def check_threads():
         latest = get_latest(thread_url)
         if latest != thread_url:
             logger.info("Found new thread for %s: %s" % (thread_name, latest))
-            smtp_server.starttls()
-            smtp_server.login(USER, PW)
+
             emails = [email_user_update(user, thread_name, latest) for user in thread.get('users')]
-            smtp_server.quit()
 
             if all(emails):
                 update_thread(thread, latest)
@@ -124,7 +137,7 @@ def email_user_update(user, thread_name, new_thread_url, attempts=10):
     msg['To'] = get_email(user)
     msg['From'] = "%s@gmail.com" % USER
     for i in range(1, attempts + 1):
-        logger.info("Attempt #%s" % (i, ))
+        logger.info("Attempt #%s" % (i,))
         try:
             smtp_server.send_message(msg)
             logger.info("Sent message:\n%s" % msg)
@@ -149,6 +162,7 @@ if __name__ == "__main__":
     while True:
         try:
             check_threads()
+
             time_to_sleep = 60 * 60
             time.sleep(time_to_sleep)
         except Exception as err:
