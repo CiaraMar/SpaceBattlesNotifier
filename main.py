@@ -23,8 +23,6 @@ logger.addHandler(handler)
 mongo_client = MongoClient()
 
 smtp_server = smtplib.SMTP('smtp.gmail.com', 587)
-smtp_server.starttls()
-smtp_server.login(USER, PW)
 
 
 def get_threads():
@@ -106,9 +104,13 @@ def check_threads():
         latest = get_latest(thread_url)
         if latest != thread_url:
             logger.info("Found new thread for %s: %s" % (thread_name, latest))
-            update_thread(thread, latest)
-            for user in thread.get('users'):
-                email_user_update(user, thread_name, latest)
+            smtp_server.starttls()
+            smtp_server.login(USER, PW)
+            emails = [email_user_update(user, thread_name, latest) for user in thread.get('users')]
+            smtp_server.quit()
+
+            if all(emails):
+                update_thread(thread, latest)
 
 
 def email_user_update(user, thread_name, new_thread_url, attempts=10):
@@ -126,9 +128,11 @@ def email_user_update(user, thread_name, new_thread_url, attempts=10):
         try:
             smtp_server.send_message(msg)
             logger.info("Sent message:\n%s" % msg)
-            break
+
+            return True
         except Exception as e:
             log_stack_trace()
+    return False
 
 
 def get_users():
