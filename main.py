@@ -86,18 +86,21 @@ def get_next(url):
 
 
 def get_latest(url):
-    second_last = ''
-    last_url = url
-    next_url = get_next(url)
-    while next_url != last_url:
-        second_last = last_url
-        last_url = next_url
-        next_url = get_next(next_url)
+    try:
+        second_last = ''
+        last_url = url
+        next_url = get_next(url)
+        while next_url != last_url:
+            second_last = last_url
+            last_url = next_url
+            next_url = get_next(next_url)
 
-    if check_is_vote(next_url):
-        return second_last
-    else:
-        return next_url
+        if check_is_vote(next_url):
+            return second_last
+        else:
+            return next_url
+    except:
+        log_stack_trace()
 
 
 def join_url(orig_url, new_url):
@@ -162,8 +165,8 @@ if __name__ == "__main__":
     while True:
         try:
             check_threads()
-
-            time_to_sleep = 60 * 60
-            time.sleep(time_to_sleep)
         except Exception as err:
             log_stack_trace()
+
+        time_to_sleep = 60 * 60
+        time.sleep(time_to_sleep)
