@@ -8,7 +8,7 @@ import re
 import logging
 import datetime
 import traceback
-import sys
+import multiprocess as mp
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -46,7 +46,8 @@ def get_threads():
 
 
 def get_email(user):
-    users = mongo_client['sb_notif_data']['users']
+    mongo_client2 = MongoClient()
+    users = mongo_client2['sb_notif_data']['users']
     filt = {
         'name': user
     }
@@ -55,7 +56,8 @@ def get_email(user):
 
 
 def update_thread(thread, new_url):
-    threads = mongo_client['sb_notif_data']['threads']
+    mongo_client2 = MongoClient()
+    threads = mongo_client2['sb_notif_data']['threads']
     thread['url'] = new_url
     thread['last_updated'] = datetime.datetime.now()
     threads.save(thread)
@@ -113,20 +115,24 @@ def is_latest(url):
 
 
 @email_connect(USER, PW)
+def process_thread(thread):
+    thread_name = thread.get('thread')
+    thread_url = thread.get('url')
+    logger.info("Checking for latest on %s" % thread_name)
+    latest = get_latest(thread_url)
+    if latest != thread_url:
+        logger.info("Found new thread for %s: %s" % (thread_name, latest))
+
+        emails = [email_user_update(user, thread_name, latest) for user in thread.get('users')]
+
+        if all(emails):
+            update_thread(thread, latest)
+
+
 def check_threads():
-    threads = get_threads()
-    for thread in threads:
-        thread_name = thread.get('thread')
-        thread_url = thread.get('url')
-        logger.info("Checking for latest on %s" % thread_name)
-        latest = get_latest(thread_url)
-        if latest != thread_url:
-            logger.info("Found new thread for %s: %s" % (thread_name, latest))
-
-            emails = [email_user_update(user, thread_name, latest) for user in thread.get('users')]
-
-            if all(emails):
-                update_thread(thread, latest)
+    threads = list(get_threads())
+    with mp.Pool(len(threads)) as p:
+        p.map(process_thread, threads)
 
 
 def email_user_update(user, thread_name, new_thread_url, attempts=10):
@@ -161,10 +167,24 @@ def log_stack_trace():
     logger.warning(traceback.format_exc())
 
 
+def wide_msg(s, wanted_length=80):
+    padded_str = '|: %s :|' % s
+    s_len = len(padded_str)
+    left_over = wanted_length - s_len
+    l_side_len = int(left_over / 2)
+    r_side_len = left_over - l_side_len
+    l_side = '=' * l_side_len
+    r_side = '=' * r_side_len
+    return l_side + padded_str + r_side
+
+
 if __name__ == "__main__":
     while True:
         try:
+            logger.info(wide_msg('Starting Check'))
             check_threads()
+            logger.info(wide_msg('Finished Check'))
+            logger.info('')
         except Exception as err:
             log_stack_trace()
 

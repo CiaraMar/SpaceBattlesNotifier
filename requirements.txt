@@ -7,3 +7,4 @@ pymongo==3.6.1
 pyquery==1.4.0
 requests==2.18.4
 urllib3==1.22
+multiprocess
