@@ -88,19 +88,17 @@ def get_next(url):
 
 
 def get_latest(url):
+    url_list = [url]
     try:
-        second_last = ''
-        last_url = url
         next_url = get_next(url)
-        while next_url != last_url:
-            second_last = last_url
-            last_url = next_url
+        while next_url != url_list[-1]:
+            url_list.append(next_url)
             next_url = get_next(next_url)
 
-        if check_is_vote(next_url):
-            return second_last
-        else:
-            return next_url
+        while url_list:
+            latest = url_list.pop()
+            if not check_is_vote(latest):
+                return latest
     except:
         log_stack_trace()
 
